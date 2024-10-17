@@ -1,0 +1,281 @@
+---
+title: "Untitled"
+author: "Tai Yue"
+date: "2024-10-13"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+problem1:
+
+The dataset contains 2,595,176 rows and 7 columns, providing weather-related data. Key variables include:
+id: Station or data source identifier.
+date: The date of the recorded weather data.
+prcp: Precipitation .
+snow: Snowfall.
+snwd: Snow depth.
+tmax: Maximum temperature.
+tmin: Minimum temperature.
+Missing data is significant, particularly in the temperature variables (tmax, tmin) and snow depth, with over 1 million missing entries for temperature and over 500,000 for snow depth.
+
+The most commonly observed value is 0 mm of snow, which indicates that snowfall is rare or not prevalent in many recorded dates and locations. Small snowfall amounts like 25 mm, 13 mm, and 51 mm are also frequent, but much less common than no snowfall.
+
+problem2:
+
+```{r}
+read.csv('nhanes_accel.csv')
+
+```
+
+```{r}
+read.csv('nhanes_covar (1).csv')
+```
+```{r}
+
+library(dplyr)
+
+
+accel_data <- read.csv("nhanes_accel.csv")  # Replace with actual path
+covar_data <- read.csv("nhanes_covar (1).csv", skip = 3)  
+
+colnames(covar_data) <- c("SEQN", "sex", "age", "BMI", "education")
+
+
+covar_data <- covar_data %>%
+  mutate(
+    age = as.numeric(age),  # Convert age to numeric
+    BMI = as.numeric(BMI),  # Convert BMI to numeric
+    sex = recode(sex, '1' = 'Male', '2' = 'Female'),  
+   
+    education = recode(education, 
+                       '1' = 'Less than high school', 
+                       '2' = 'High school equivalent', 
+                       '3' = 'More than high school')  
+  )
+
+
+covar_filtered <- covar_data %>%
+  filter(!is.na(age) & !is.na(sex) & !is.na(BMI) & !is.na(education) & age >= 21)
+
+
+merged_data <- merge(accel_data, covar_filtered, by = "SEQN")
+
+
+str(merged_data)
+
+
+merged_data <- merged_data %>%
+  mutate(
+    sex = factor(sex, levels = c("Male", "Female")),
+    education = factor(education, levels = c("Less than high school", "High school equivalent", "More than high school"))
+  )
+
+
+head(merged_data)
+
+```
+```{r}
+
+library(dplyr)
+library(ggplot2)
+
+
+gender_education_table <- merged_data %>%
+  group_by(education, sex) %>%
+  summarise(count = n()) %>%
+  arrange(education, sex)
+
+
+print(gender_education_table)
+
+
+ggplot(merged_data, aes(x = age, fill = sex)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~education) +
+  labs(title = "Age Distributions by Sex and Education Category",
+       x = "Age",
+       y = "Density") +
+  theme_minimal() +
+  scale_fill_manual(values = c("Male" = "blue", "Female" = "pink"))
+
+```
+
+There is a clear relationship between age and educational attainment, with participants who have less formal education tending to be older.
+
+Gender differences also exist within these categories, particularly in the "Less than high school" group, where females appear to have a stronger presence in the older age ranges.
+
+The density plots provide a clear visual comparison, emphasizing how the distribution of ages varies not only by education but also by sex within each education category.
+
+```{r}
+
+library(dplyr)
+library(ggplot2)
+
+
+merged_data <- merged_data %>%
+  mutate(total_activity = rowSums(select(., starts_with("min"))))
+
+
+ggplot(merged_data, aes(x = age, y = total_activity, color = sex)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +  # Add a trend line (linear model)
+  facet_wrap(~education) +
+  labs(title = "Total Activity vs Age by Sex and Education Level",
+       x = "Age",
+       y = "Total Activity",
+       color = "Sex") +
+  theme_minimal()
+
+```
+
+Higher educational attainment seems to correlate with higher physical activity, particularly at younger ages.
+
+There is a noticeable gender gap in physical activity, with men generally having higher total activity than women, although this difference narrows as education levels increase.
+
+The decline in physical activity with age is consistent, reinforcing the idea that age is a significant factor in overall physical activity levels. However, the extent of this decline varies by both gender and education.
+
+```{r}
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)  
+
+
+activity_long <- merged_data %>%
+  select(SEQN, sex, education, starts_with("min")) %>%
+  pivot_longer(cols = starts_with("min"), 
+               names_to = "minute", 
+               names_prefix = "min", 
+               values_to = "activity") %>%
+  mutate(minute = as.numeric(minute))  
+
+ggplot(activity_long, aes(x = minute, y = activity, color = sex)) +
+  geom_smooth(se = FALSE) + 
+  facet_wrap(~education) +
+  labs(title = "24-hour Activity Time Course by Education Level and Sex",
+       x = "Minute of the Day",
+       y = "Activity (MIMS)",
+       color = "Sex") +
+  theme_minimal()
+
+
+```
+Higher education levels are associated with more structured daily activity patterns, suggesting that individuals with more education may have routines that involve more defined periods of physical activity.
+
+ Men tend to have slightly higher activity levels in the morning, while women may maintain activity better into the evening, particularly in higher education categories.
+
+The most active times of the day are during the morning and evening, with a clear reduction in activity during the middle of the day, which is likely reflective of work or rest periods.
+
+problem3:
+```{r}
+
+library(dplyr)
+library(readr)
+library(tidyr)
+
+
+jan_2020 <- read_csv("Jan 2020 Citi.csv")
+jan_2024 <- read_csv("Jan 2024 Citi.csv")
+july_2020 <- read_csv("July 2020 Citi.csv")
+july_2024 <- read_csv("July 2024 Citi.csv")
+
+
+jan_2020 <- jan_2020 %>% mutate(year = 2020, month = "January")
+jan_2024 <- jan_2024 %>% mutate(year = 2024, month = "January")
+july_2020 <- july_2020 %>% mutate(year = 2020, month = "July")
+july_2024 <- july_2024 %>% mutate(year = 2024, month = "July")
+
+
+all_data <- bind_rows(jan_2020, jan_2024, july_2020, july_2024)
+
+
+clean_data <- all_data %>%
+  filter(!is.na(member_casual), !is.na(year), !is.na(month)) %>%
+  mutate(member_casual = ifelse(member_casual %in% c("member", "casual"), member_casual, NA)) %>%
+  drop_na(member_casual)
+
+
+summary_table <- clean_data %>%
+  group_by(year, month, member_casual) %>%
+  summarise(total_rides = n(), .groups = 'drop')
+
+
+print(summary_table)
+
+
+library(knitr)
+kable(summary_table, format = "markdown")
+
+```
+
+The sharp increase in member rides from 2020 to 2024 shows that the Citi Bike system has become an integral part of New York City's transportation infrastructure. The expansion of the system and the introduction of electric bikes have likely contributed to this growth.
+
+Casual ridership has also grown but at a slower pace compared to members. This could reflect a shift where more frequent users are opting for membership to take advantage of lower rental rates.
+
+The stark difference between winter and summer ridership demonstrates that bike-sharing is still highly dependent on seasonal factors, though year-round adoption is increasing.
+
+```{r}
+
+top_stations_july_2024 <- july_2024 %>%
+  group_by(start_station_name) %>%
+  summarise(total_rides = n()) %>%
+  arrange(desc(total_rides)) %>%
+  slice_max(order_by = total_rides, n = 5)
+
+
+top_stations_july_2024
+
+```
+```{r}
+
+library(ggplot2)
+
+
+ride_duration_summary <- all_data %>%
+  group_by(year, month, weekdays) %>%
+  summarise(median_duration = median(duration, na.rm = TRUE))
+
+
+ggplot(ride_duration_summary, aes(x = weekdays, y = median_duration, fill = month)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~ year) +
+  theme_minimal() +
+  labs(title = "Median Ride Duration by Day of Week, Month, and Year",
+       x = "Day of Week", y = "Median Ride Duration (Minutes)")
+
+```
+The median ride duration tends to be longer on weekends across both years, especially in July. This suggests that casual or recreational riders may be more active on weekends, leading to longer trips.Weekdays generally show shorter median ride durations, which could be due to more frequent use of Citi Bikes for commuting or shorter, functional trips during the workweek.
+
+The month of July consistently shows longer median ride durations compared to January, which is likely due to more favorable weather in summer, encouraging longer rides.In January, especially in 2024, the median ride durations are shorter, possibly due to colder weather conditions leading to quicker or more utilitarian trips.
+
+The median ride durations in July 2020 are generally higher than in 2024, which might suggest a change in rider behavior, increased availability of electric bikes, or more frequent but shorter trips in the more recent years.January 2020 and January 2024 both exhibit shorter rides, but there is a slight increase in the median duration for July 2024 compared to July 2020 on weekdays, possibly indicating more casual riders.
+
+```{r}
+
+data_2024 <- all_data %>%
+  filter(year == 2024)
+
+
+ggplot(data_2024, aes(x = duration, fill = member_casual)) +
+  geom_density(alpha = 0.6) +
+  facet_grid(rideable_type ~ month) +
+  scale_x_continuous(limits = c(0, 60)) +  
+  theme_minimal() +
+  labs(title = "Distribution of Ride Duration by Month, Membership Status, and Bike Type (2024)",
+       x = "Ride Duration (Minutes)",
+       y = "Density",
+       fill = "Membership Status")
+
+```
+Electric Bikes generally have shorter ride durations compared to classic bikes, for both members and casual riders. July shows slightly longer ride durations compared to January. In January, rides are typically shorter, possibly due to harsher winter conditions that discourage longer trips.For both bike types, the July distributions for casual riders are more spread out, suggesting that casual users may take more exploratory or longer trips during the summer.
+
+Members consistently show shorter ride durations, especially for electric bikes. Casual Riders have a wider distribution of ride durations, particularly in July, indicating that they might take longer, less structured trips, possibly for recreational purposes.
+
+For classic bikes, casual riders tend to take slightly longer rides compared to members. This difference is more obvious in July, where casual rides tend to spread across a wider range of durations.Electric bikes show a much more concentrated distribution around shorter durations, reflecting their efficiency and the fact that both members and casual riders are likely to use them for shorter trips.
+
+
